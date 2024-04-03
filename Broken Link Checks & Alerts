@@ -1,0 +1,67 @@
+function main() {
+  var urls = {};
+  var report = AdsApp.report(
+    "SELECT CreativeFinalUrls, Id, AdGroupId, AdGroupName, CampaignName " +
+    "FROM AD_PERFORMANCE_REPORT " +
+    "WHERE AdNetworkType1 = SEARCH " +
+    "AND AdType = EXPANDED_TEXT_AD " +
+    "AND CampaignStatus = ENABLED " +
+    "AND AdGroupStatus IN [ENABLED, PAUSED] " +
+    "AND Status = ENABLED"
+  );
+  
+  var rows = report.rows();
+  
+  while (rows.hasNext()) {
+    var row = rows.next();
+    var url = JSON.parse(row["CreativeFinalUrls"])[0];
+    var id = row.Id;
+    var adGroupId = row.AdGroupId;
+    var adGroupName = row.AdGroupName;
+    var campaignName = row.CampaignName;
+    
+    if (urls[url] == undefined) {
+      urls[url] = [];
+    }
+    urls[url].push({ id: id, adGroupId: adGroupId, adGroupName: adGroupName, campaignName: campaignName });
+  }
+  
+  var urlData = Object.keys(urls);
+ 
+  var brokenUrls = [];
+  
+  urlData.forEach(function (item) {
+    if (checkUrl(item)) {
+      urls[item].forEach(function(ad) {
+        brokenUrls.push(ad);
+      });
+    }
+  });
+
+  if (brokenUrls.length > 0) {
+    sendAlertEmail(brokenUrls);
+  }
+}
+
+function checkUrl (url) {
+  var params = {muteHttpExceptions:true, followRedirects: false};
+  var resp = UrlFetchApp.fetch(url, params).getResponseCode();
+  return resp !== 200;
+}
+
+function sendAlertEmail(brokenAds) {
+  var emailSubject = "Alert: Broken URLs in Google Ads";
+  var emailBody = "The following ads have broken URLs:\n\n";
+  
+  brokenAds.forEach(function(ad) {
+    emailBody += "Campaign: " + ad.campaignName + "\n";
+    emailBody += "Ad Group: " + ad.adGroupName + "\n";
+    emailBody += "Ad ID: " + ad.id + "\n\n";
+  });
+  
+  MailApp.sendEmail({
+    to: "muhib@nestcommerce.co", // Replace with your email address
+    subject: Goose & Gander,
+    body: emailBody
+  });
+}
